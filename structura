@@ -1,9 +1,0 @@
-final_project/
-├── main.py                     # Входная точка, меню и CLI-логика
-├── mysql_connector.py          # Работа с MySQL: поиск фильмов
-├── log_writer.py               # Логирование запросов в MongoDB
-├── log_stats.py                # Анализ логов из MongoDB
-├── formatter.py                # Форматированный вывод в консоль
-├── config.py                   # Настройки подключения и константы
-├── requirements.txt            # Зависимости проекта
-└── README.md                   # Документация (опционально)
