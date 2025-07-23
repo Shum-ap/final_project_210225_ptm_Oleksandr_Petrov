@@ -1,4 +1,4 @@
-# main.py
+# main_proekt.py
 
 from dotenv import load_dotenv
 load_dotenv()  # Загрузка переменных из .env
