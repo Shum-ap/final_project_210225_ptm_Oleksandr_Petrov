@@ -1,1 +1,0 @@
-# final_project_210225_ptm_Oleksandr_Petrov

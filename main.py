@@ -1,31 +1,40 @@
-# Импорт логики поиска, логирования и вывода
+# Импортируем функции из модулей проекта
 from mysql_connector import (
     search_by_keyword,
     get_genres_and_years,
     search_by_genre_and_year
 )
-from log_writer import log_search                      # запись логов в MongoDB
-from log_stats import get_recent_searches, get_top_searches  # получение статистики
-from formatter import print_results                   # форматированный вывод фильмов
-from tabulate import tabulate                         # вывод таблиц в консоли
+from log_writer import log_search
+from log_stats import get_recent_searches, get_top_searches
+from formatter import print_results
+from tabulate import tabulate
 
 
-# Общая функция постраничного поиска (по 10 результатов за раз)
+# 🔁 Универсальная функция постраничного вывода результатов (по 10 за раз)
 def paginate_search(search_func, log_info, **kwargs):
     offset = 0
     while True:
-        results = search_func(offset=offset, **kwargs)         # получение результатов
-        print_results(results)                                 # вывод фильмов
-        log_search(**log_info, results_count=len(results))     # логируем запрос
-        if len(results) < 10:                                  # если конец — выходим
+        # Получаем порцию результатов из MySQL
+        results = search_func(offset=offset, **kwargs)
+
+        # Выводим таблицу фильмов
+        print_results(results)
+
+        # Логируем запрос в MongoDB
+        log_search(**log_info, results_count=len(results))
+
+        # Если меньше 10 результатов — это конец
+        if len(results) < 10:
             break
+
+        # Спрашиваем у пользователя: продолжать или нет
         next_page = input("Показать ещё 10? (y/n): ")
         if next_page.lower() != 'y':
             break
         offset += 10
 
 
-# Главное меню
+# 🧠 Главная функция приложения — отображает меню и обрабатывает выбор пользователя
 def main():
     while True:
         print("\nМеню:")
@@ -35,28 +44,49 @@ def main():
         print("4. Последние 5 запросов")
         print("0. Выход")
 
-        choice = input("Выберите опцию: ")
+        choice = input("Выберите опцию: ").strip()
 
-        # Поиск по названию фильма
+        # 🔍 Поиск по ключевому слову
         if choice == '1':
-            keyword = input("Введите ключевое слово: ")
+            keyword = input("Введите ключевое слово: ").strip()
+            if not keyword:
+                print("❌ Ключевое слово не может быть пустым.")
+                continue
+
+            # Выполняем поиск и логируем
             paginate_search(
                 search_by_keyword,
                 log_info={"search_type": "keyword", "params": {"keyword": keyword}},
                 keyword=keyword
             )
 
-        # Поиск по жанру и годовому диапазону
+        # 🎞 Поиск по жанру и диапазону годов
         elif choice == '2':
             genres, min_year, max_year = get_genres_and_years()
+
             print("\nДоступные жанры:")
             print(", ".join(genres))
             print(f"Диапазон годов: {min_year} – {max_year}")
 
-            genre = input("Введите жанр: ")
-            year_from = int(input("Год с: "))
-            year_to = int(input("Год до: "))
+            genre = input("Введите жанр: ").strip()
+            if genre not in genres:
+                print("❌ Жанр не найден.")
+                continue
 
+            # Обработка ошибок ввода чисел
+            try:
+                year_from = int(input("Год с: ").strip())
+                year_to = int(input("Год до: ").strip())
+            except ValueError:
+                print("❌ Ошибка: введите корректные целые числа для годов.")
+                continue
+
+            # Проверка на допустимый диапазон
+            if year_from < min_year or year_to > max_year or year_from > year_to:
+                print(f"❌ Годы должны быть в диапазоне {min_year}–{max_year}, и 'с' ≤ 'до'.")
+                continue
+
+            # Выполняем поиск и логируем
             paginate_search(
                 search_by_genre_and_year,
                 log_info={
@@ -68,7 +98,7 @@ def main():
                 end_year=year_to
             )
 
-        # Топ-5 самых частых запросов (по группировке в MongoDB)
+        # 📊 Топ-5 популярных запросов из MongoDB (группировка по параметрам)
         elif choice == '3':
             print("\n📊 Топ 5 популярных запросов:\n")
             top = get_top_searches()
@@ -94,9 +124,10 @@ def main():
 
                     table.append([query_type, query_str, count])
 
+                # Табличный вывод
                 print(tabulate(table, headers=["Тип запроса", "Параметры", "Количество"], tablefmt="grid"))
 
-        # Последние 5 запросов (по дате)
+        # 🕒 Последние 5 запросов (MongoDB: сортировка по времени)
         elif choice == '4':
             print("\n🕒 Последние 5 запросов:\n")
             recent = get_recent_searches()
@@ -111,7 +142,7 @@ def main():
                     count = entry.get("results_count", 0)
                     timestamp = entry.get("timestamp", "-")
 
-                    # Формируем строку параметров в зависимости от типа
+                    # Читаемая строка параметров
                     if search_type == "keyword":
                         param_str = f"'{params.get('keyword', '')}'"
                     elif search_type == "genre_year":
@@ -127,7 +158,7 @@ def main():
                     tablefmt="grid"
                 ))
 
-        # Завершение программы
+        # ❎ Завершение программы
         elif choice == '0':
             print("👋 Выход...")
             break
@@ -136,6 +167,6 @@ def main():
             print("❌ Неверный ввод. Попробуйте снова.")
 
 
-# Запуск программы
+# ▶️ Запуск программы
 if __name__ == '__main__':
     main()
