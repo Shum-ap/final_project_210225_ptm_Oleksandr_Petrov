@@ -12,6 +12,5 @@ MONGO_URI = (
     "&ssl=false&authMechanism=DEFAULT&authSource=ich_edit"
 )
 
-
 MONGO_DB = "ich_edit"
 MONGO_COLLECTION = "final_project_210225_ptm_Oleksandr_Petrov"
