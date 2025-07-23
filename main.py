@@ -1,3 +1,8 @@
+# main.py
+
+from dotenv import load_dotenv
+load_dotenv()  # Загрузка переменных из .env
+
 # Импортируем функции из модулей проекта
 from mysql_connector import (
     search_by_keyword,

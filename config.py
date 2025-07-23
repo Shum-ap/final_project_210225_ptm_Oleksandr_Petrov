@@ -1,18 +1,18 @@
-# 🔐 Настройки подключения к MySQL
-MYSQL_CONFIG = {
-    "host": "ich-db.edu.itcareerhub.de",
-    "user": "ich1",
-    "password": "password",
-    "database": "sakila",
-}
+# config.py
+import os
+from dotenv import load_dotenv
 
-# 🔐 Подключение к MongoDB (удалённый сервер)
+load_dotenv()  # Загружаем .env один раз
+
+# MongoDB
+MONGO_USER = os.getenv("MONGO_USER")
+MONGO_PASSWORD = os.getenv("MONGO_PASSWORD")
+MONGO_HOST = os.getenv("MONGO_HOST")
+MONGO_DB = os.getenv("MONGO_DB")
+MONGO_COLLECTION = os.getenv("MONGO_COLLECTION")
+
+# Сформированный URI
 MONGO_URI = (
-    "mongodb://ich_editor:verystrongpassword"
-    "@mongo.itcareerhub.de/?readPreference=primary"
-    "&ssl=false&authMechanism=DEFAULT&authSource=ich_edit"
+    f"mongodb://{MONGO_USER}:{MONGO_PASSWORD}@{MONGO_HOST}/"
+    f"?readPreference=primary&ssl=false&authMechanism=DEFAULT&authSource={MONGO_DB}"
 )
-
-# 🧾 Конкретная коллекция и база для логов
-MONGO_DB = "ich_edit"
-MONGO_COLLECTION = "final_project_210225_ptm_Oleksandr_Petrov"
