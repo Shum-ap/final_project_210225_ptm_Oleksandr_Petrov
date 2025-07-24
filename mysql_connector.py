@@ -23,23 +23,25 @@ def search_by_keyword(keyword, offset=0, limit=10):
         conn.close()
 
 
-# 📦 Получает список уникальных жанров и диапазон годов выпуска фильмов
-def get_genres_and_years():
-    conn = get_connection()  # Устанавливаем подключение к MySQL
+# 📋 Возвращает жанры, диапазоны годов и количество фильмов в каждом жанре
+def get_genres_with_years():
+    query = """
+    SELECT c.name, MIN(f.release_year) AS min_year, MAX(f.release_year) AS max_year, COUNT(*) AS film_count
+    FROM category c
+    JOIN film_category fc ON c.category_id = fc.category_id
+    JOIN film f ON f.film_id = fc.film_id
+    GROUP BY c.name
+    ORDER BY c.name;
+    """
+    conn = get_connection()
     try:
         with conn.cursor() as cursor:
-            # 📋 Получаем уникальные названия жанров из таблицы category
-            # DISTINCT гарантирует, что жанры не будут повторяться
-            cursor.execute("SELECT DISTINCT name FROM category;")
-            genres = sorted(set(row[0] for row in cursor.fetchall()))  # Сортируем список жанров по алфавиту
-
-            # 📊 Получаем минимальный и максимальный год выпуска всех фильмов
-            cursor.execute("SELECT MIN(release_year), MAX(release_year) FROM film;")
-            min_year, max_year = cursor.fetchone()
-
-            return genres, min_year, max_year  # Возвращаем список жанров и диапазон годов
+            cursor.execute(query)
+            return cursor.fetchall()
     finally:
-        conn.close()  # Закрываем подключение к базе
+        conn.close()
+
+
 
 
 
