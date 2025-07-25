@@ -2,3 +2,4 @@ pymysql
 pymongo
 tabulate
 python-dotenv
+mysql-connector-python

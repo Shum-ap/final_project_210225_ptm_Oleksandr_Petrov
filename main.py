@@ -103,13 +103,6 @@ def main():
                 keyword=keyword
             )
 
-        # 🎞 Поиск по жанру и году
-        elif choice == '2':
-            genre_data = get_genres_with_years()
-
-            table = []
-            for i, (genre, g_min, g_max, count) in enumerate(genre_data):
-                table.append([i + 1, genre, g_min, g_max, count])
 
             print("\n🎬 Доступные жанры:\n")
             print(tabulate(
