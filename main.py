@@ -11,13 +11,13 @@ from log_stats import get_recent_searches, get_top_searches
 from formatter import print_results
 from tabulate import tabulate
 
+
 # 🔁 Постраничный вывод результатов с переходом по страницам
 def paginate_search(search_func, log_info, **kwargs):
     offset = 0
     limit = 10
     current_page = 1
 
-    # Получаем все результаты заранее
     all_results = []
     while True:
         batch = search_func(offset=len(all_results), **kwargs)
@@ -44,8 +44,13 @@ def paginate_search(search_func, log_info, **kwargs):
 
         print(f"📄 Страница {current_page} из {total_pages} | Показано {min(end_idx, total_results)} из {total_results}")
 
-        user_input = input(
-            "➡️ Введите 'n' — следующая, 'p' — предыдущая, 'q' — выход, номер страницы: ").strip().lower()
+        try:
+            user_input = input(
+                "➡️ Введите 'n' — следующая, 'p' — предыдущая, 'q' — выход, номер страницы: "
+            ).strip().lower()
+        except KeyboardInterrupt:
+            print("\n🚪 Пользователь прервал просмотр. Выход...\n")
+            break
 
         if user_input == 'q':
             print("🚪 Выход из просмотра.\n")
@@ -68,18 +73,22 @@ def paginate_search(search_func, log_info, **kwargs):
                 print("❌ Неверный номер страницы.")
         else:
             print("❌ Команда не распознана.")
-1
+
 
 # 🧠 Главное меню
 def main():
     while True:
-        print("\nМеню:")
-        print("1. Поиск по ключевому слову")
-        print("2. Поиск по жанру и году")
-        print("3. История запросов (топ или последние)")
-        print("0. Выход")
+        try:
+            print("\nМеню:")
+            print("1. Поиск по ключевому слову")
+            print("2. Поиск по жанру и диапазону годов")
+            print("3. История запросов (топ или последние)")
+            print("0. Выход")
 
-        choice = input("Выберите опцию: ").strip()
+            choice = input("Выберите опцию: ").strip()
+        except KeyboardInterrupt:
+            print("\n👋 Программа завершена пользователем.")
+            break
 
         # 🔍 Поиск по ключевому слову
         if choice == '1':
@@ -96,7 +105,7 @@ def main():
 
         # 🎞 Поиск по жанру и году
         elif choice == '2':
-            genre_data = get_genres_with_years()  # [(genre, min_year, max_year, count), ...]
+            genre_data = get_genres_with_years()
 
             table = []
             for i, (genre, g_min, g_max, count) in enumerate(genre_data):
