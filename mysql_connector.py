@@ -5,16 +5,37 @@ import os
 load_dotenv()
 
 
-# 🔍 Поиск по ключевому слову (в названии и описании фильма)
-def search_by_keyword(keyword, offset=0, limit=10):
-    connection = mysql.connector.connect(
+# 📦 Получение подключения к базе данных
+def get_connection():
+    return mysql.connector.connect(
         host=os.getenv("MYSQL_HOST"),
         user=os.getenv("MYSQL_USER"),
         password=os.getenv("MYSQL_PASSWORD"),
         database=os.getenv("MYSQL_DATABASE")
     )
 
-    cursor = connection.cursor(dictionary=True)
+
+# 🔁 Универсальный обработчик SQL-запросов
+def run_query(query, params=(), dictionary=False):
+    connection = None
+    cursor = None
+    try:
+        connection = get_connection()
+        cursor = connection.cursor(dictionary=dictionary)
+        cursor.execute(query, params)
+        return cursor.fetchall()
+    except mysql.connector.Error as err:
+        print(f"Database error: {err}")
+        return []
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+
+
+# 🔍 Поиск по ключевому слову (в названии и описании фильма)
+def search_by_keyword(keyword, offset=0, limit=10):
     query = """
         SELECT
             f.title,
@@ -28,24 +49,11 @@ def search_by_keyword(keyword, offset=0, limit=10):
         ORDER BY f.title
         LIMIT %s OFFSET %s;
     """
-    cursor.execute(query, (f"%{keyword}%", f"%{keyword}%", limit, offset))
-    results = cursor.fetchall()
-
-    cursor.close()
-    connection.close()
-    return results
+    return run_query(query, (f"%{keyword}%", f"%{keyword}%", limit, offset), dictionary=True)
 
 
 # 🎞 Получение уникальных жанров с диапазонами годов и количеством фильмов
 def get_genres_with_years():
-    connection = mysql.connector.connect(
-        host=os.getenv("MYSQL_HOST"),
-        user=os.getenv("MYSQL_USER"),
-        password=os.getenv("MYSQL_PASSWORD"),
-        database=os.getenv("MYSQL_DATABASE")
-    )
-
-    cursor = connection.cursor()
     query = """
         SELECT
             c.name AS genre,
@@ -58,24 +66,11 @@ def get_genres_with_years():
         GROUP BY c.name
         ORDER BY c.name;
     """
-    cursor.execute(query)
-    results = cursor.fetchall()
-
-    cursor.close()
-    connection.close()
-    return results  # [(genre, min_year, max_year, count), ...]
+    return run_query(query)
 
 
 # 🎯 Поиск по жанру и диапазону лет
 def search_by_genre_and_year(genre, start_year, end_year, offset=0, limit=10):
-    connection = mysql.connector.connect(
-        host=os.getenv("MYSQL_HOST"),
-        user=os.getenv("MYSQL_USER"),
-        password=os.getenv("MYSQL_PASSWORD"),
-        database=os.getenv("MYSQL_DATABASE")
-    )
-
-    cursor = connection.cursor(dictionary=True)
     query = """
         SELECT
             f.title,
@@ -89,9 +84,4 @@ def search_by_genre_and_year(genre, start_year, end_year, offset=0, limit=10):
         ORDER BY f.release_year
         LIMIT %s OFFSET %s;
     """
-    cursor.execute(query, (genre, start_year, end_year, limit, offset))
-    results = cursor.fetchall()
-
-    cursor.close()
-    connection.close()
-    return results
+    return run_query(query, (genre, start_year, end_year, limit, offset), dictionary=True)
