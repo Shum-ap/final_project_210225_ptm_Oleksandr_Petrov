@@ -1,18 +1,17 @@
 from tabulate import tabulate
 
-# 📋 Форматированный вывод фильмов с учётом общей нумерации
 def print_results(results, start_index=1):
-    if not results:
-        print("⚠️ Нет результатов.\n")
-        return
+    """
+    Выводит результаты в табличном виде.
+    results — список словарей с ключами: title, year, description.
+    """
+    table = []
+    for i, item in enumerate(results, start=start_index):
+        title = item.get("title", "—")
+        year = item.get("year", "—")
+        desc = item.get("description", item.get("desc", "—"))
+        table.append([i, title, year, desc])
 
-    headers = ["#", "Название", "Год", "Описание (до 100 символов)"]
-
-    table = [
-        [start_index + i, title, year, (desc[:100] + "...") if desc and len(desc) > 100 else desc]
-        for i, (title, year, desc) in enumerate(results)
-    ]
-
+    headers = ["№", "Название", "Год", "Описание"]
     print(tabulate(table, headers=headers, tablefmt="grid"))
-    print()  # Пустая строка для отступа
 

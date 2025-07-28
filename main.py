@@ -1,4 +1,5 @@
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from mysql_connector import (
@@ -12,8 +13,23 @@ from formatter import print_results
 from tabulate import tabulate
 
 
-# 🔁 Постраничный вывод результатов с переходом по страницам
+# 🔁 — Функция для постраничного вывода результатов поиска с навигацией по страницам
 def paginate_search(search_func, log_info, **kwargs):
+    """
+    🔍 Выполняет поиск с пагинацией.
+
+    Args:
+        search_func (function): функция поиска, принимающая offset и другие параметры.
+        log_info (dict): информация для логирования поиска.
+        **kwargs: дополнительные параметры для search_func.
+
+    Работа:
+    - Загружает все результаты с помощью вызовов search_func с offset.
+    - Делит результаты на страницы по 10 элементов.
+    - Позволяет пользователю листать страницы ('n', 'p', номер страницы), или выйти ('q').
+    - При выводе страницы результаты печатаются через print_results.
+    - Каждая страница логируется.
+    """
     offset = 0
     limit = 10
     current_page = 1
@@ -75,14 +91,26 @@ def paginate_search(search_func, log_info, **kwargs):
             print("❌ Команда не распознана.")
 
 
-# 🧠 Главное меню
+# 🧠 — Главная функция с меню пользователя и навигацией по разделам
 def main():
+    """
+    🗂 Главное меню приложения.
+
+    Меню предлагает пользователю выбрать:
+    1 — Поиск по ключевому слову
+    2 — Поиск по жанру и диапазону годов
+    3 — Просмотр истории запросов (топ 5 или последние уникальные 5)
+    0 — Выход из программы
+
+    Внутри пунктов реализована валидация ввода и вызов соответствующих функций.
+    Пункт 3 реализован с подменю и возможностью возврата в главное меню.
+    """
     while True:
         try:
             print("\nМеню:")
             print("1. Поиск по ключевому слову")
             print("2. Поиск по жанру и диапазону годов")
-            print("3. История запросов (топ или последние)")
+            print("3. История запросов (топ 5 или уникальные последние 5)")
             print("0. Выход")
 
             choice = input("Выберите опцию: ").strip()
@@ -103,6 +131,18 @@ def main():
                 keyword=keyword
             )
 
+        # 🎬 Поиск по жанру и году
+        elif choice == '2':
+            genre_data = get_genres_with_years()  # Получаем данные по жанрам и диапазонам годов
+
+            if not genre_data:
+                print("⚠️ Данные о жанрах отсутствуют.")
+                continue
+
+            # 🗒 Формируем таблицу жанров для красивого вывода
+            table = []
+            for idx, (genre, year_min, year_max, count) in enumerate(genre_data, start=1):
+                table.append([idx, genre, year_min, year_max, count])
 
             print("\n🎬 Доступные жанры:\n")
             print(tabulate(
@@ -115,6 +155,7 @@ def main():
             genre = None
             genre_min, genre_max = None, None
 
+            # Обработка выбора жанра по номеру или названию
             if genre_input.isdigit():
                 index = int(genre_input) - 1
                 if 0 <= index < len(genre_data):
@@ -135,6 +176,7 @@ def main():
 
             print(f"📅 Диапазон годов для жанра {genre}: {genre_min}–{genre_max}")
 
+            # Ввод и проверка года
             try:
                 year_from = int(input("Год с: ").strip())
                 year_to = int(input("Год до: ").strip())
@@ -157,69 +199,84 @@ def main():
                 end_year=year_to
             )
 
-        # 🧾 История запросов: топ или последние
+        # 🧾 Меню истории запросов с подменю и возможностью возврата
         elif choice == '3':
-            print("\n📚 История запросов:")
-            print("1. Топ-5 популярных запросов")
-            print("2. Последние 5 уникальных запросов")
-            sub_choice = input("Выберите тип (1 или 2): ").strip()
+            while True:
+                print("\n📚 История запросов:")
+                print("1. Топ-5 популярных запросов")
+                print("2. Последние 5 уникальных запросов")
+                print("0. Выйти в основное меню")
 
-            if sub_choice == '1':
-                print("\n📊 Топ 5 популярных запросов:\n")
-                top = get_top_searches()
-                if not top:
-                    print("⚠️ Нет данных.")
+                sub_choice = input("Выберите тип (1, 2 или 0): ").strip()
+
+                if sub_choice == '0':
+                    print("🚪 Возврат в основное меню...")
+                    break
+
+                if sub_choice == '1':
+                    print("\n📊 Топ 5 популярных запросов:\n")
+                    top = get_top_searches()
+                    if not top:
+                        print("⚠️ Нет данных.")
+                    else:
+                        table = []
+                        for entry in top:
+                            params = entry["_id"]
+                            count = entry["count"]
+
+                            if "keyword" in params:
+                                query_type = "По ключевому слову"
+                                query_str = params["keyword"]
+                            elif "genre" in params:
+                                query_type = "По жанру и году"
+                                query_str = f"{params['genre']} ({params['from']}–{params['to']})"
+                            else:
+                                query_type = "Неизвестный тип"
+                                query_str = str(params)
+
+                            table.append([query_type, query_str, count])
+
+                        print(tabulate(table, headers=["Тип запроса", "Параметры", "Количество"], tablefmt="grid"))
+
+                elif sub_choice == '2':
+                    print("\n🕒 Последние 5 уникальных запросов:\n")
+                    recent = get_recent_searches()
+                    if not recent:
+                        print("⚠️ Нет данных.")
+                    else:
+                        table = []
+                        for entry in recent:
+                            search_type = entry.get("search_type", "неизв.")
+                            params = entry.get("params", {})
+                            count = entry.get("results_count", 0)
+                            timestamp = entry.get("timestamp", "-")
+
+                            genre_or_keyword = "-"
+                            year_range = "-"
+                            if search_type == "keyword":
+                                genre_or_keyword = params.get("keyword", "-")
+                            elif search_type == "genre_year":
+                                genre_or_keyword = params.get("genre", "-")
+                                year_range = f"{params.get('from')}–{params.get('to')}"
+
+                            table.append([search_type, genre_or_keyword, year_range, count, timestamp])
+
+                        print(tabulate(
+                            table,
+                            headers=["Тип запроса", "Жанр / Ключевое", "Годы", "Кол-во", "Время"],
+                            tablefmt="grid"
+                        ))
                 else:
-                    table = []
-                    for entry in top:
-                        params = entry["_id"]
-                        count = entry["count"]
+                    print("❌ Неверный выбор. Попробуйте снова.")
 
-                        if "keyword" in params:
-                            query_type = "По ключевому слову"
-                            query_str = params["keyword"]
-                        elif "genre" in params:
-                            query_type = "По жанру и году"
-                            query_str = f"{params['genre']} ({params['from']}–{params['to']})"
-                        else:
-                            query_type = "Неизвестный тип"
-                            query_str = str(params)
+                # Позволяет либо продолжить смотреть историю, либо выйти в главное меню
+                cont = input(
+                    "\nВведите 'c' для продолжения просмотра истории или 'q' для выхода в основное меню: ").strip().lower()
+                if cont == 'q':
+                    print("🚪 Возврат в основное меню...")
+                    break
 
-                        table.append([query_type, query_str, count])
-
-                    print(tabulate(table, headers=["Тип запроса", "Параметры", "Количество"], tablefmt="grid"))
-
-            elif sub_choice == '2':
-                print("\n🕒 Последние 5 уникальных запросов:\n")
-                recent = get_recent_searches()
-                if not recent:
-                    print("⚠️ Нет данных.")
-                else:
-                    table = []
-                    for entry in recent:
-                        search_type = entry.get("search_type", "неизв.")
-                        params = entry.get("params", {})
-                        count = entry.get("results_count", 0)
-                        timestamp = entry.get("timestamp", "-")
-
-                        genre_or_keyword = "-"
-                        year_range = "-"
-                        if search_type == "keyword":
-                            genre_or_keyword = params.get("keyword", "-")
-                        elif search_type == "genre_year":
-                            genre_or_keyword = params.get("genre", "-")
-                            year_range = f"{params.get('from')}–{params.get('to')}"
-
-                        table.append([search_type, genre_or_keyword, year_range, count, timestamp])
-
-                    print(tabulate(
-                        table,
-                        headers=["Тип запроса", "Жанр / Ключевое", "Годы", "Кол-во", "Время"],
-                        tablefmt="grid"
-                    ))
-            else:
-                print("❌ Неверный выбор. Возврат в меню.")
-
+        # 🛑 Выход из программы
         elif choice == '0':
             print("👋 Выход...")
             break
@@ -227,6 +284,6 @@ def main():
             print("❌ Неверный ввод. Попробуйте снова.")
 
 
-# ▶️ Запуск
+# ▶️ — Запуск программы при прямом вызове файла
 if __name__ == '__main__':
     main()
