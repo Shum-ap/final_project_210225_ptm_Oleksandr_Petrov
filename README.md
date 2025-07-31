@@ -37,13 +37,17 @@
 ## 📁 Структура проекта
 
 final_project_210225_ptm_Oleksandr_Petrov/
+│> .venv/
+│> dopolnitelnoe/
 │
+├── .env # 🔐 Переменные окружения (Mongo/MySQL)
+├── .gitignore
+├── config.py # Настройки подключения к базам (из .env)
+├── formatter.py # Форматированный табличный вывод (таблица tabulate)
+├── log_stats.py # Получение статистики из логов (топ, последние)
+├── log_writer.py # Логирование запросов в MongoDB
 ├── main.py # Точка входа: консольное меню, логика поиска и истории
 ├── mysql_connector.py # Подключение к MySQL, поиск по ключу и жанрам
-├── log_writer.py # Логирование запросов в MongoDB
-├── log_stats.py # Получение статистики из логов (топ, последние)
-├── formatter.py # Форматированный табличный вывод (таблица tabulate)
-├── config.py # Настройки подключения к базам (из .env)
-├── .env # 🔐 Переменные окружения (Mongo/MySQL)
+├── README.md # Документация (текущий файл)
 ├── requirements.txt # Зависимости проекта
-└── README.md # Документация (текущий файл)
+├── test_connection.py # Проверка подключения
