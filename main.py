@@ -8,10 +8,10 @@ from mysql_connector import (
 )
 from log_writer import log_search
 from log_stats import get_recent_searches, get_top_searches
-from formatter import print_results
 from tabulate import tabulate
 
-# 🗂️ Пагинация результатов с возможностью перехода по страницам
+
+# 🗂️ Пагинация результатов с переходами по страницам
 def paginate_search(search_func, log_info, **kwargs):
     offset = 0
     limit = 10
@@ -33,26 +33,25 @@ def paginate_search(search_func, log_info, **kwargs):
         print("⚠️ Ничего не найдено.")
         return
 
+    # ✅ Логировать один раз
+    log_search(**log_info, results_count=total_results)
+
     while True:
         start_idx = (current_page - 1) * limit
         end_idx = start_idx + limit
         current_batch = all_results[start_idx:end_idx]
 
-        # Вывод в виде таблицы с номерами
         table = []
         for i, item in enumerate(current_batch, start=start_idx + 1):
-            # Проверяем структуру записи и формируем строку таблицы
-            # Пример: item = (title, year, description)
             if isinstance(item, (list, tuple)) and len(item) >= 3:
                 title, year, desc = item[0], item[1], item[2]
+                desc = (desc[:100] + "...") if desc and len(desc) > 100 else desc
                 table.append([i, title, year, desc])
             else:
                 table.append([i, str(item)])
 
         headers = ["№", "Название", "Год", "Описание"] if all(len(row) == 4 for row in table) else ["№", "Результат"]
         print(tabulate(table, headers=headers, tablefmt="grid"))
-
-        log_search(**log_info, results_count=len(current_batch))
 
         print(f"📄 Страница {current_page} из {total_pages} | Показано {min(end_idx, total_results)} из {total_results}")
 
@@ -89,7 +88,7 @@ def paginate_search(search_func, log_info, **kwargs):
             print("❌ Команда не распознана.")
 
 
-# 📚 Меню истории запросов с возвратом в подменю после просмотра
+# 📚 Меню истории: топ или последние
 def history_submenu():
     while True:
         print("\n📚 История запросов:")
@@ -148,7 +147,7 @@ def history_submenu():
 
                 print(tabulate(
                     table,
-                    headers=["Тип запроса", "Жанр / Ключевое", "Годы", "Кол-во", "Время"],
+                    headers=["Тип", "Жанр / Ключевое", "Годы", "Кол-во", "Время"],
                     tablefmt="grid"
                 ))
         elif sub_choice == '0':
@@ -158,7 +157,7 @@ def history_submenu():
             print("❌ Неверный выбор. Попробуйте снова.")
 
 
-# 🧠 Главное меню
+# 🧠 Главное меню приложения
 def main():
     while True:
         try:
@@ -225,7 +224,6 @@ def main():
 
             print(f"📅 Диапазон годов для жанра {genre}: {genre_min}–{genre_max}")
 
-            # Цикл с проверкой корректности ввода годов
             while True:
                 try:
                     year_from = int(input("Год с: ").strip())
@@ -261,6 +259,6 @@ def main():
             print("❌ Неверный ввод. Попробуйте снова.")
 
 
-# ▶️ Запуск программы
+# ▶️ Запуск
 if __name__ == '__main__':
     main()
