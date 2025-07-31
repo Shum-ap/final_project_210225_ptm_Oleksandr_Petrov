@@ -1,6 +1,21 @@
+"""
+🎬 final_project_210225_ptm_Oleksandr_Petrov
+Консольное приложение для поиска фильмов с историей запросов.
+
+Модули:
+- mysql_connector: поиск в MySQL
+- log_writer: логирование в MongoDB
+- log_stats: получение статистики
+- formatter: табличный вывод (tabulate)
+- config + .env: настройки подключения
+"""
+
 from dotenv import load_dotenv
+
+# Загрузка переменных окружения из .env
 load_dotenv()
 
+# 🔧 Импорт модулей проекта
 from mysql_connector import (
     search_by_keyword,
     get_genres_with_years,
@@ -8,76 +23,69 @@ from mysql_connector import (
 )
 from log_writer import log_search
 from log_stats import get_recent_searches, get_top_searches
+from formatter import format_table  # ✅ абстрагируем вывод
 from tabulate import tabulate
 
 
-# 🗂️ Пагинация результатов с переходами по страницам
+# 🗂️ Пагинация результатов поиска
 def paginate_search(search_func, log_info, **kwargs):
-    offset = 0
+    """
+    Постраничный вывод результатов поиска.
+    Логирует запрос один раз, после получения всех данных.
+    Поддерживает навигацию: следующая, предыдущая, переход по номеру.
+    """
     limit = 10
-    current_page = 1
-
     all_results = []
+
+    # 🔍 Собираем все результаты
+    offset = 0
     while True:
-        batch = search_func(offset=len(all_results), **kwargs)
+        batch = search_func(offset=offset, limit=limit, **kwargs)
         if not batch:
             break
         all_results.extend(batch)
-        if len(batch) < limit:
+        offset += limit
+        if len(batch) < limit:  # меньше, чем лимит → конец
             break
 
-    total_results = len(all_results)
-    total_pages = (total_results + limit - 1) // limit
-
-    if total_results == 0:
+    total = len(all_results)
+    if total == 0:
         print("⚠️ Ничего не найдено.")
         return
 
-    # ✅ Логировать один раз
-    log_search(**log_info, results_count=total_results)
+    # ✅ Логируем только один раз, после полного поиска
+    log_search(**log_info, results_count=total)
+
+    # 📄 Пагинация
+    total_pages = (total + limit - 1) // limit
+    current_page = 1
 
     while True:
         start_idx = (current_page - 1) * limit
         end_idx = start_idx + limit
-        current_batch = all_results[start_idx:end_idx]
+        page_results = all_results[start_idx:end_idx]
 
-        table = []
-        for i, item in enumerate(current_batch, start=start_idx + 1):
-            if isinstance(item, (list, tuple)) and len(item) >= 3:
-                title, year, desc = item[0], item[1], item[2]
-                desc = (desc[:100] + "...") if desc and len(desc) > 100 else desc
-                table.append([i, title, year, desc])
-            else:
-                table.append([i, str(item)])
-
-        headers = ["№", "Название", "Год", "Описание"] if all(len(row) == 4 for row in table) else ["№", "Результат"]
-        print(tabulate(table, headers=headers, tablefmt="grid"))
-
-        print(f"📄 Страница {current_page} из {total_pages} | Показано {min(end_idx, total_results)} из {total_results}")
+        # ✅ Используем единый форматировщик
+        print(format_table(page_results, page=current_page, total=total, limit=limit))
 
         try:
-            user_input = input(
+            prompt = (
                 "➡️ Введите 'n' — следующая, "
                 + ("'p' — предыдущая, " if current_page > 1 else "")
-                + "'q' — выход, номер страницы: "
-            ).strip().lower()
+                + "'q' — выход, или номер страницы: "
+            )
+            user_input = input(prompt).strip().lower()
         except KeyboardInterrupt:
-            print("\n🚪 Пользователь прервал просмотр. Выход...\n")
+            print("\n🚪 Просмотр прерван. Возврат в меню...")
             break
 
         if user_input == 'q':
             print("🚪 Выход из просмотра.\n")
             break
-        elif user_input == 'n':
-            if current_page < total_pages:
-                current_page += 1
-            else:
-                print("📌 Вы уже на последней странице.")
-        elif user_input == 'p':
-            if current_page > 1:
-                current_page -= 1
-            else:
-                print("📌 Вы уже на первой странице.")
+        elif user_input == 'n' and current_page < total_pages:
+            current_page += 1
+        elif user_input == 'p' and current_page > 1:
+            current_page -= 1
         elif user_input.isdigit():
             page = int(user_input)
             if 1 <= page <= total_pages:
@@ -85,21 +93,22 @@ def paginate_search(search_func, log_info, **kwargs):
             else:
                 print("❌ Неверный номер страницы.")
         else:
-            print("❌ Команда не распознана.")
+            print("❌ Неизвестная команда.")
 
 
-# 📚 Меню истории: топ или последние
+# 📚 Подменю: история запросов
 def history_submenu():
+    """Показывает топ или последние запросы из MongoDB."""
     while True:
         print("\n📚 История запросов:")
-        print("1. Топ-5 популярных запросов")
-        print("2. Последние 5 уникальных запросов")
-        print("0. Выйти в основное меню")
-        sub_choice = input("Выберите тип (1, 2 или 0): ").strip()
+        print("1. 📊 Топ-5 популярных запросов")
+        print("2. 🕒 Последние 5 уникальных запросов")
+        print("0. ◀️ Выйти в основное меню")
 
-        if sub_choice == '1':
-            print("\n📊 Топ 5 популярных запросов:\n")
-            top = get_top_searches()
+        choice = input("Выберите: ").strip()
+
+        if choice == '1':
+            top = get_top_searches(limit=5)
             if not top:
                 print("⚠️ Нет данных.")
             else:
@@ -115,16 +124,17 @@ def history_submenu():
                         query_type = "По жанру и году"
                         query_str = f"{params['genre']} ({params['from']}–{params['to']})"
                     else:
-                        query_type = "Неизвестный тип"
+                        query_type = "Неизвестный"
                         query_str = str(params)
 
                     table.append([query_type, query_str, count])
 
-                print(tabulate(table, headers=["Тип запроса", "Параметры", "Количество"], tablefmt="grid"))
+                print(tabulate(table,
+                               headers=["Тип", "Параметры", "Кол-во"],
+                               tablefmt="grid"))
 
-        elif sub_choice == '2':
-            print("\n🕒 Последние 5 уникальных запросов:\n")
-            recent = get_recent_searches()
+        elif choice == '2':
+            recent = get_recent_searches(limit=5)
             if not recent:
                 print("⚠️ Нет данных.")
             else:
@@ -135,130 +145,134 @@ def history_submenu():
                     count = entry.get("results_count", 0)
                     timestamp = entry.get("timestamp", "-")
 
-                    genre_or_keyword = "-"
+                    genre_or_kw = "-"
                     year_range = "-"
                     if search_type == "keyword":
-                        genre_or_keyword = params.get("keyword", "-")
+                        genre_or_kw = params.get("keyword", "-")
                     elif search_type == "genre_year":
-                        genre_or_keyword = params.get("genre", "-")
-                        year_range = f"{params.get('from')}–{params.get('to')}"
+                        genre_or_kw = params.get("genre", "-")
+                        year_range = f"{params.get('from', '?')}–{params.get('to', '?')}"
 
-                    table.append([search_type, genre_or_keyword, year_range, count, timestamp])
+                    table.append([search_type, genre_or_kw, year_range, count, timestamp[:19]])
 
-                print(tabulate(
-                    table,
-                    headers=["Тип", "Жанр / Ключевое", "Годы", "Кол-во", "Время"],
-                    tablefmt="grid"
-                ))
-        elif sub_choice == '0':
-            print("🚪 Возврат в основное меню...\n")
+                print(tabulate(table,
+                               headers=["Тип", "Ключ", "Годы", "Найдено", "Время"],
+                               tablefmt="grid"))
+
+        elif choice == '0':
+            print("🚪 Возврат в главное меню...\n")
             break
         else:
             print("❌ Неверный выбор. Попробуйте снова.")
 
 
-# 🧠 Главное меню приложения
+# 🧠 Главное меню
 def main():
+    """Главная точка входа. Цикл меню с обработкой ввода и ошибок."""
+    print("📘 Добро пожаловать в MovieSearch CLI!")
+
     while True:
         try:
-            print("\n📘 Главное меню:")
+            print("\n📋 Главное меню:")
             print("1. 🔍 Поиск по ключевому слову")
             print("2. 🎞️ Поиск по жанру и диапазону годов")
-            print("3. 📚 История запросов")
+            print("3. 📚 Просмотр истории запросов")
             print("0. 🛑 Выход")
+
             choice = input("Выберите опцию: ").strip()
-        except KeyboardInterrupt:
-            print("\n👋 Программа завершена пользователем.")
-            break
 
-        if choice == '1':
-            keyword = input("Введите ключевое слово: ").strip()
-            if not keyword:
-                print("❌ Ключевое слово не может быть пустым.")
-                continue
-
-            paginate_search(
-                search_by_keyword,
-                log_info={"search_type": "keyword", "params": {"keyword": keyword}},
-                keyword=keyword
-            )
-
-        elif choice == '2':
-            genre_data = get_genres_with_years()
-            if not genre_data:
-                print("⚠️ Нет данных по жанрам.")
-                continue
-
-            table = []
-            for idx, (genre, year_min, year_max, count) in enumerate(genre_data, start=1):
-                table.append([idx, genre, year_min, year_max, count])
-
-            print("\n🎬 Доступные жанры:\n")
-            print(tabulate(
-                table,
-                headers=["№", "Жанр", "Год от", "Год до", "Фильмов"],
-                tablefmt="grid"
-            ))
-
-            genre_input = input("\nВведите номер жанра или его название: ").strip()
-            genre = None
-            genre_min, genre_max = None, None
-
-            if genre_input.isdigit():
-                index = int(genre_input) - 1
-                if 0 <= index < len(genre_data):
-                    genre, genre_min, genre_max, _ = genre_data[index]
-                else:
-                    print("❌ Неверный номер.")
+            if choice == '1':
+                keyword = input("🔑 Введите ключевое слово: ").strip()
+                if not keyword:
+                    print("❌ Ключевое слово не может быть пустым.")
                     continue
-            else:
-                found = next(
-                    ((g, g_min, g_max, _) for g, g_min, g_max, _ in genre_data if g.lower() == genre_input.lower()),
-                    None
+
+                paginate_search(
+                    search_by_keyword,
+                    log_info={"search_type": "keyword", "params": {"keyword": keyword}},
+                    keyword=keyword
                 )
-                if found:
-                    genre, genre_min, genre_max, _ = found
+
+            elif choice == '2':
+                # 🎬 Загружаем доступные жанры
+                genres = get_genres_with_years()
+                if not genres:
+                    print("⚠️ Нет доступных жанров.")
+                    continue
+
+                # 🖨️ Показываем таблицу жанров
+                table = [[i, g, y_min, y_max, cnt] for i, (g, y_min, y_max, cnt) in enumerate(genres, 1)]
+                print("\n🎬 Доступные жанры:")
+                print(tabulate(table,
+                               headers=["№", "Жанр", "С", "По", "Фильмов"],
+                               tablefmt="grid"))
+
+                # 🧩 Обработка выбора жанра
+                genre_input = input("Введите номер или название жанра: ").strip()
+                selected_genre = None
+
+                if genre_input.isdigit():
+                    idx = int(genre_input) - 1
+                    if 0 <= idx < len(genres):
+                        selected_genre = genres[idx]
+                    else:
+                        print("❌ Неверный номер.")
+                        continue
                 else:
-                    print("❌ Жанр не найден.")
-                    continue
+                    matched = [g for g in genres if g[0].lower() == genre_input.lower()]
+                    if matched:
+                        selected_genre = matched[0]
+                    else:
+                        print("❌ Жанр не найден.")
+                        continue
 
-            print(f"📅 Диапазон годов для жанра {genre}: {genre_min}–{genre_max}")
+                genre, min_year, max_year, _ = selected_genre
+                print(f"📅 Диапазон для '{genre}': {min_year}–{max_year}")
 
-            while True:
-                try:
-                    year_from = int(input("Год с: ").strip())
-                    year_to = int(input("Год до: ").strip())
-                except ValueError:
-                    print("❌ Ошибка: введите корректные целые числа.")
-                    continue
+                # 📆 Ввод диапазона лет
+                while True:
+                    try:
+                        from_year = int(input(f"Год от ({min_year}): ") or min_year)
+                        to_year = int(input(f"Год до ({max_year}): ") or max_year)
+                    except ValueError:
+                        print("❌ Введите целое число.")
+                        continue
 
-                if year_from < genre_min or year_to > genre_max or year_from > year_to:
-                    print(f"❌ Годы должны быть в пределах {genre_min}–{genre_max}, и 'с' ≤ 'до'. Попробуйте снова.")
-                    continue
-                else:
-                    break
+                    if from_year > to_year:
+                        print("❌ 'От' не может быть больше 'До'.")
+                    elif from_year < min_year or to_year > max_year:
+                        print(f"❌ Годы вне диапазона: {min_year}–{max_year}.")
+                    else:
+                        break
 
-            paginate_search(
-                search_by_genre_and_year,
-                log_info={
-                    "search_type": "genre_year",
-                    "params": {"genre": genre, "from": year_from, "to": year_to}
-                },
-                genre=genre,
-                start_year=year_from,
-                end_year=year_to
-            )
+                paginate_search(
+                    search_by_genre_and_year,
+                    log_info={
+                        "search_type": "genre_year",
+                        "params": {"genre": genre, "from": from_year, "to": to_year}
+                    },
+                    genre=genre,
+                    start_year=from_year,
+                    end_year=to_year
+                )
 
-        elif choice == '3':
-            history_submenu()
+            elif choice == '3':
+                history_submenu()
 
-        elif choice == '0':
-            print("👋 Выход...")
+            elif choice == '0':
+                print("👋 Спасибо за использование! До свидания.")
+                break
+
+            else:
+                print("❌ Неверная опция. Попробуйте снова.")
+
+        except KeyboardInterrupt:
+            print("\n\n👋 Программа завершена по Ctrl+C.")
             break
-        else:
-            print("❌ Неверный ввод. Попробуйте снова.")
+        except Exception as e:
+            print(f"⚠️ Неожиданная ошибка: {e}")
 
 
-# ▶️ Запуск
-if __name__ == '__main__':
+# ▶️ Запуск приложения
+if __name__ == "__main__":
     main()
